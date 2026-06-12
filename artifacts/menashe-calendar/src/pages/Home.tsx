@@ -682,6 +682,49 @@ export default function Home({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
         </div>
 
+        {/* ── Premium Banner ── */}
+        <div
+          onClick={onShowPremium}
+          style={{
+            marginBottom: 12, borderRadius: 16, overflow: "hidden", cursor: "pointer",
+            background: "linear-gradient(135deg, #1a1500 0%, #2a1f00 40%, #1a1a2e 100%)",
+            border: "1.5px solid rgba(212,168,67,0.4)",
+            boxShadow: "0 4px 20px rgba(212,168,67,0.12), inset 0 1px 0 rgba(212,168,67,0.08)",
+            position: "relative",
+          }}
+        >
+          <div style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+              background: "linear-gradient(135deg, rgba(212,168,67,0.25), rgba(212,168,67,0.08))",
+              border: "1px solid rgba(212,168,67,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+            }}>👑</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#d4a843", marginBottom: 3 }}>✦ MENASHE PREMIUM</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "white", marginBottom: 2 }}>Unlock All Features</div>
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>Torah · AI Insights · Advanced Zmanim · More</div>
+            </div>
+            <div style={{
+              background: "linear-gradient(135deg, #b8860b 0%, #d4a843 50%, #f0c96a 100%)",
+              color: "#1a0f00", fontSize: 11, fontWeight: 800,
+              padding: "6px 12px", borderRadius: 8, whiteSpace: "nowrap",
+            }}>Try Free →</div>
+          </div>
+          <div style={{
+            display: "flex", borderTop: "1px solid rgba(212,168,67,0.12)",
+            padding: "8px 16px", gap: 0,
+          }}>
+            {["Torah Study", "AI Insights", "Full Zmanim", "Community"].map((feat, i, arr) => (
+              <div key={feat} style={{
+                flex: 1, fontSize: 10, fontWeight: 600, letterSpacing: "0.04em",
+                color: "rgba(212,168,67,0.7)", textAlign: "center",
+                borderRight: i < arr.length - 1 ? "1px solid rgba(212,168,67,0.12)" : "none",
+              }}>{feat}</div>
+            ))}
+          </div>
+        </div>
+
         {/* ── Quick Actions ── */}
         <div className="quick-action-grid" style={{ marginBottom: 4 }}>
           <div className="quick-action" onClick={onShowHolidays}>

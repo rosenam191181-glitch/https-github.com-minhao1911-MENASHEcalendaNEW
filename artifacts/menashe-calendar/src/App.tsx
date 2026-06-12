@@ -5,6 +5,7 @@ import CalendarPage from "./pages/CalendarPage";
 import ZmanimPage from "./pages/ZmanimPage";
 import SiddurPage from "./pages/SiddurPage";
 import SettingsPage from "./pages/SettingsPage";
+import PremiumPage from "./pages/PremiumPage";
 import BottomNav from "./components/BottomNav";
 import { useNotifications } from "./hooks/useNotifications";
 
@@ -31,7 +32,7 @@ import MoreToolsModal from "./pages/MoreToolsModal";
 import { LOCATIONS, Location } from "./lib/locations";
 import type { Book } from "./pages/SiddurPage";
 
-type Page = "home" | "calendar" | "zmanim" | "siddur" | "settings";
+type Page = "home" | "calendar" | "zmanim" | "siddur" | "settings" | "premium";
 type Modal =
   | "location" | "holidays" | "premium" | "parashah" | "dafyomi" | "zmaniminfo"
   | "torahnote" | "birthday" | "tahara" | "yartzeit" | "community" | "census"
@@ -119,7 +120,7 @@ export default function App() {
             onMoreTools={() => setModal("more")}
             onShowHolidays={() => setModal("holidays")}
             onShowParashah={() => setModal("parashah")}
-            onShowPremium={() => setModal("premium")}
+            onShowPremium={() => setActivePage("premium")}
             onShowDafYomi={() => setModal("dafyomi")}
             onShowOmer={() => setModal("omer")}
             onLocationClick={() => setModal("location")}
@@ -160,7 +161,7 @@ export default function App() {
             location={location}
             onToggleTheme={toggleTheme}
             onLocationClick={() => setModal("location")}
-            onPremium={() => setModal("premium")}
+            onPremium={() => setActivePage("premium")}
             onTahara={() => setModal("tahara")}
             onYartzeit={() => setModal("yartzeit")}
             onBirthday={() => setModal("birthday")}
@@ -171,6 +172,13 @@ export default function App() {
             leadTime={leadTime}
             onUpdateNotifPref={updateNotifPref}
             onUpdateLeadTime={updateLeadTime}
+          />
+        );
+      case "premium":
+        return (
+          <PremiumPage
+            onUpgrade={() => setModal("premium")}
+            onBack={() => setActivePage("home")}
           />
         );
     }

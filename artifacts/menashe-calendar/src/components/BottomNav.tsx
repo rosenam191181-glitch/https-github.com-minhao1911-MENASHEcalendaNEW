@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { id: "calendar", label: "Calendar", icon: CalendarIcon },
   { id: "zmanim", label: "Zmanim", icon: ClockIcon },
   { id: "siddur", label: "Siddur", icon: SiddurIcon },
+  { id: "premium", label: "Premium", icon: PremiumIcon },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -51,6 +52,14 @@ function SiddurIcon({ active }: { active: boolean }) {
   );
 }
 
+function PremiumIcon({ active }: { active: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill={active ? "#d4a843" : "none"} stroke={active ? "#d4a843" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+    </svg>
+  );
+}
+
 function SettingsIcon({ active }: { active: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,18 +71,37 @@ function SettingsIcon({ active }: { active: boolean }) {
 
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {
   return (
-    <div className="bottom-nav">
-      {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          className={`nav-item ${active === id ? "active" : ""}`}
-          onClick={() => onNavigate(id)}
-          style={{ background: "none", border: "none", outline: "none" }}
-        >
-          <Icon active={active === id} />
-          <span>{label}</span>
-        </button>
-      ))}
+    <div className="bottom-nav" style={{ display: "flex" }}>
+      {NAV_ITEMS.map(({ id, label, icon: Icon }) => {
+        const isPremium = id === "premium";
+        const isActive = active === id;
+        return (
+          <button
+            key={id}
+            className={`nav-item ${isActive ? "active" : ""}`}
+            onClick={() => onNavigate(id)}
+            style={{
+              background: "none", border: "none", outline: "none",
+              flex: 1,
+              ...(isPremium ? {
+                color: isActive ? "#d4a843" : "rgba(212,168,67,0.7)",
+              } : {}),
+            }}
+          >
+            <Icon active={isActive} />
+            <span style={isPremium ? {
+              background: isActive
+                ? "linear-gradient(135deg, #b8860b 0%, #d4a843 50%, #f0c96a 100%)"
+                : "none",
+              WebkitBackgroundClip: isActive ? "text" : "unset",
+              WebkitTextFillColor: isActive ? "transparent" : "rgba(212,168,67,0.8)",
+              fontWeight: isActive ? 800 : 700,
+            } : {}}>
+              {label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
