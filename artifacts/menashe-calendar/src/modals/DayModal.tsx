@@ -3,6 +3,8 @@ import { HDate, HebrewCalendar, flags } from "@hebcal/core";
 import { calculateZmanim, formatTime } from "../lib/zmanim";
 import { Location } from "../lib/locations";
 import { hebrewDayNumeral } from "../lib/hebrewCalendar";
+import { getOmerDay } from "./OmerModal";
+import { getCurrentParasha } from "../lib/parasha";
 
 const API_BASE = "/api";
 
@@ -204,13 +206,15 @@ export default function DayModal({ day, month, year, location, onClose }: Props)
     il: true,
     isHebrewYear: false,
     sedrot: true,
-    mask: flags.PARSHA_HASHAVUA | flags.CHAG | flags.ROSH_CHODESH | flags.SPECIAL_SHABBAT,
+    mask: flags.PARSHA_HASHAVUA | flags.CHAG | flags.ROSH_CHODESH | flags.SPECIAL_SHABBAT | flags.MINOR_FAST | flags.MAJOR_FAST,
   }).map(ev => ev.render("en"));
 
   const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
   const dateLong = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   const isShabbat = date.getDay() === 6;
   const isFriday = date.getDay() === 5;
+  const omerDay = getOmerDay(date);
+  const parasha = getCurrentParasha(date);
 
   const holidayEvents = events.filter(isHoliday);
 
@@ -243,29 +247,112 @@ export default function DayModal({ day, month, year, location, onClose }: Props)
           <HolidayInsightsSection key={i} holidayName={ev} />
         ))}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <div className="card" style={{ padding: 14, textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>SUNRISE</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>{formatTime(zmanim.sunrise, location.tz)}</div>
-          </div>
-          <div className="card" style={{ padding: 14, textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 700, letterSpacing: "0.08em", marginBottom: 6 }}>SUNSET</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>{formatTime(zmanim.sunset, location.tz)}</div>
-          </div>
-        </div>
-
-        {(isFriday || isShabbat) && (
-          <div className="card" style={{ padding: 14, marginBottom: 12, border: "1px solid rgba(212,168,67,0.3)", background: "rgba(212,168,67,0.05)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>🕯 Candle Lighting</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#d4a843" }}>{formatTime(zmanim.candleLighting, location.tz)}</div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)" }}>Havdalah</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>{formatTime(zmanim.havdalah, location.tz)}</div>
+        {/* Omer count */}
+        {omerDay !== null && (
+          <div className="card" style={{ padding: 14, marginBottom: 12, border: "1px solid rgba(212,168,67,0.2)", background: "rgba(212,168,67,0.04)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <svg width="44" height="44" viewBox="0 0 52 52">
+                  <circle cx="26" cy="26" r="21" fill="none" stroke="rgba(212,168,67,0.2)" strokeWidth="5" />
+                  <circle cx="26" cy="26" r="21" fill="none" stroke="#d4a843" strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 21}
+                    strokeDashoffset={2 * Math.PI * 21 - (omerDay / 49) * 2 * Math.PI * 21}
+                    transform="rotate(-90 26 26)"
+                  />
+                </svg>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 12, fontWeight: 900, color: "#d4a843" }}>{omerDay}</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 2 }}>SEFIRAT HA'OMER</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>Day {omerDay} of 49</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{49 - omerDay} day{49 - omerDay !== 1 ? "s" : ""} until Shavuot</div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Parasha for the week */}
+        {parasha && (
+          <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 8 }}>THIS WEEK'S PARASHA</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                background: "rgba(212,168,67,0.12)", border: "1px solid rgba(212,168,67,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontFamily: "'Noto Serif Hebrew', serif", fontSize: 20, color: "#d4a843" }}>פ</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Parashat {parasha.name}</div>
+                <div style={{ fontFamily: "'Noto Serif Hebrew', serif", fontSize: 13, color: "#d4a843" }}>{parasha.hebrewName}</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{parasha.book} · {parasha.verses}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Full Zmanim */}
+        <div className="card" style={{ padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 12 }}>⏱ ZMANIM</div>
+          {([
+            { label: "Alot HaShachar", emoji: "🌄", time: zmanim.alotHaShachar, sub: "Dawn · 72 min before sunrise" },
+            { label: "Netz HaChamah", emoji: "🌅", time: zmanim.sunrise, sub: "Sunrise" },
+            { label: "Latest Shema", emoji: "📜", time: zmanim.latestShema, sub: "GRA — 3 halachic hours" },
+            { label: "Latest Shacharit", emoji: "🕍", time: zmanim.latestShacharit, sub: "GRA — 4 halachic hours" },
+            { label: "Chatzot", emoji: "☀️", time: zmanim.chatzot, sub: "Halachic noon" },
+            { label: "Mincha Gedolah", emoji: "🕌", time: zmanim.minchaGedolah, sub: "Earliest Mincha" },
+            { label: "Plag HaMincha", emoji: "🌆", time: zmanim.plagHamincha, sub: "10¾ halachic hours" },
+            { label: "Shkiah", emoji: "🌇", time: zmanim.sunset, sub: "Sunset" },
+            { label: "Tzais HaKochavim", emoji: "✨", time: zmanim.tzais, sub: "Nightfall · 42 min after sunset" },
+          ] as const).map(({ label, emoji, time, sub }, idx, arr) => (
+            <div key={label} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              paddingTop: idx === 0 ? 0 : 10, paddingBottom: 10,
+              borderBottom: idx < arr.length - 1 ? "1px solid var(--border)" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 16, width: 22, flexShrink: 0 }}>{emoji}</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{label}</div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{sub}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#d4a843", fontVariantNumeric: "tabular-nums", flexShrink: 0, marginLeft: 8 }}>
+                {formatTime(time, location.tz)}
+              </div>
+            </div>
+          ))}
+
+          {(isFriday || isShabbat) && (
+            <>
+              <div style={{ height: 1, background: "rgba(212,168,67,0.2)", margin: "6px 0 10px" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, width: 22 }}>🕯</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#d4a843" }}>Candle Lighting</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{location.candleLightingMinutes} min before sunset</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#d4a843" }}>{formatTime(zmanim.candleLighting, location.tz)}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16, width: 22 }}>🌟</span>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>Havdalah</div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)" }}>42 min after sunset</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>{formatTime(zmanim.havdalah, location.tz)}</div>
+              </div>
+            </>
+          )}
+        </div>
 
         <button onClick={onClose} className="btn-close-full">Close</button>
       </div>

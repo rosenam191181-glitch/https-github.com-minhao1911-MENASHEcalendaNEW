@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
+import { HebrewCalendar, flags } from "@hebcal/core";
 import { getMonthCalendar, hebrewDayNumeral, getHebrewMonthsBetween } from "../lib/hebrewCalendar";
 import { Location } from "../lib/locations";
 import { calculateZmanim, formatTime } from "../lib/zmanim";
 import { getUpcomingParashiyot } from "../lib/parasha";
+import { getOmerDay } from "../modals/OmerModal";
 
 interface CalendarPageProps {
   location: Location;
@@ -63,6 +65,32 @@ export default function CalendarPage({ location, onNavigate, onDayClick, onLocat
     }
     return map;
   }, [year, month, location]);
+
+  const fastMap = useMemo(() => {
+    const set = new Set<number>();
+    try {
+      const events = HebrewCalendar.calendar({
+        start: new Date(year, month, 1),
+        end: new Date(year, month + 1, 0),
+        il: true, isHebrewYear: false,
+        mask: flags.MINOR_FAST | flags.MAJOR_FAST,
+      });
+      for (const ev of events) {
+        const d = ev.getDate().greg();
+        if (d.getMonth() === month && d.getFullYear() === year) set.add(d.getDate());
+      }
+    } catch {}
+    return set;
+  }, [year, month]);
+
+  const omerMap = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const d of days) {
+      const o = getOmerDay(d.date);
+      if (o !== null) map[d.gregorianDay] = o;
+    }
+    return map;
+  }, [days]);
 
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear(y => y - 1); }
@@ -265,9 +293,11 @@ export default function CalendarPage({ location, onNavigate, onDayClick, onLocat
                 ? nonRoshEvents[0].replace(/^Parashat\s+/, "").split(" ")[0].toUpperCase()
                 : null;
 
+              const isFast = fastMap.has(day.gregorianDay);
               let cellBg = "transparent";
               if (day.isToday) cellBg = "var(--gold)";
               else if (isSelected) cellBg = "rgba(212,168,67,0.14)";
+              else if (isFast) cellBg = "rgba(148,163,184,0.07)";
               else if (isSatCol) cellBg = "rgba(127,29,29,0.12)";
 
               const dayNumColor = day.isToday ? "#0f1a2e" : day.isShabbat ? "#fca5a5" : "#f1f5f9";
@@ -353,7 +383,7 @@ export default function CalendarPage({ location, onNavigate, onDayClick, onLocat
                   )}
 
                   {/* Holiday label */}
-                  {eventLabel && !day.roshChodesh && (
+                  {eventLabel && !day.roshChodesh && !isFast && (
                     <div style={{
                       fontSize: 6.5, color: "#f87171",
                       background: "rgba(239,68,68,0.12)",
@@ -364,6 +394,31 @@ export default function CalendarPage({ location, onNavigate, onDayClick, onLocat
                       textOverflow: "ellipsis", whiteSpace: "nowrap",
                     }}>
                       {eventLabel}
+                    </div>
+                  )}
+
+                  {/* Fast label */}
+                  {isFast && (
+                    <div style={{
+                      fontSize: 6.5, color: "#94a3b8",
+                      background: "rgba(148,163,184,0.14)",
+                      padding: "1px 3px", borderRadius: 3,
+                      marginTop: "auto", fontWeight: 700,
+                      letterSpacing: "0.02em", lineHeight: 1.3,
+                    }}>
+                      FAST
+                    </div>
+                  )}
+
+                  {/* Omer day indicator */}
+                  {omerMap[day.gregorianDay] !== undefined && (
+                    <div style={{
+                      position: "absolute", top: 2, left: 2,
+                      fontSize: 6, lineHeight: 1,
+                      color: day.isToday ? "rgba(15,26,46,0.65)" : "#d4a843",
+                      fontWeight: 800,
+                    }}>
+                      {omerMap[day.gregorianDay]}
                     </div>
                   )}
                 </div>
@@ -397,7 +452,16 @@ export default function CalendarPage({ location, onNavigate, onDayClick, onLocat
             </div>
 
             {/* Nav arrows */}
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button
+                onClick={() => { setMonth(today.getMonth()); setYear(today.getFullYear()); setSelectedDay(null); }}
+                style={{
+                  padding: "4px 9px", borderRadius: 99,
+                  background: "rgba(212,168,67,0.1)", border: "1px solid rgba(212,168,67,0.25)",
+                  cursor: "pointer", color: "#d4a843",
+                  fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                }}
+              >TODAY</button>
               <button
                 onClick={prevMonth}
                 style={{
