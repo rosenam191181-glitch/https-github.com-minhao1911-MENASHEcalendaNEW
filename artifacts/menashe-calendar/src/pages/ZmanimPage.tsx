@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { calculateZmanim, formatTime } from "../lib/zmanim";
 import { getHebrewDate, getHebrewMonthName, hebrewDayNumeral } from "../lib/hebrewCalendar";
 import { Location } from "../lib/locations";
@@ -8,8 +9,50 @@ interface ZmanimPageProps {
   onLocationClick: () => void;
 }
 
+interface NextZman {
+  name: string;
+  time: Date;
+}
+
+function getNextZman(zmanim: ReturnType<typeof calculateZmanim>, now: Date): NextZman | null {
+  const candidates: { name: string; time: Date | null }[] = [
+    { name: "Alot HaShachar", time: zmanim.alotHaShachar },
+    { name: "Netz HaChama", time: zmanim.sunrise },
+    { name: "Latest Shema", time: zmanim.latestShema },
+    { name: "Latest Shacharit", time: zmanim.latestShacharit },
+    { name: "Chatzot", time: zmanim.chatzot },
+    { name: "Mincha Gedolah", time: zmanim.minchaGedolah },
+    { name: "Mincha Ketana", time: zmanim.minchaKetana },
+    { name: "Plag HaMincha", time: zmanim.plagHamincha },
+    { name: "Candle Lighting", time: zmanim.candleLighting },
+    { name: "Shkia (Sunset)", time: zmanim.sunset },
+    { name: "Tzais HaKochavim", time: zmanim.tzais },
+  ];
+  const upcoming = candidates
+    .filter((c) => c.time && c.time > now)
+    .sort((a, b) => a.time!.getTime() - b.time!.getTime());
+  if (upcoming.length === 0) return null;
+  return { name: upcoming[0].name, time: upcoming[0].time! };
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0:00:00";
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 export default function ZmanimPage({ location, onInfo, onLocationClick }: ZmanimPageProps) {
-  const today = new Date();
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const today = now;
   const tz = location.tz;
   const zmanim = calculateZmanim(today, location.lat, location.lng, location.candleLightingMinutes);
   const hdate = getHebrewDate(today);
@@ -22,6 +65,11 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
 
   const shaahMin = Math.floor(zmanim.shaahZmanitGra);
   const shaahSec = Math.round((zmanim.shaahZmanitGra % 1) * 60);
+
+  const nextZman = getNextZman(zmanim, now);
+  const msUntilNext = nextZman ? nextZman.time.getTime() - now.getTime() : null;
+
+  const isAutoLocation = !["Jerusalem","Tel Aviv","Haifa","Be'er Sheva","Bnei Brak","Tzfat","Churachandpur","Imphal","Aizawl","Lunglei","New York","Los Angeles","Toronto","London","Paris","Melbourne"].includes(location.name);
 
   const prayerRows = [
     { name: "Latest Shema",      sub: "Gra — 3 shaot after Netz HaChama",    time: zmanim.latestShema },
@@ -46,7 +94,7 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
           onClick={onLocationClick}
           style={{ display: "flex", alignItems: "center", gap: 4, background: "var(--elevated)", border: "1px solid var(--border)", borderRadius: 99, padding: "5px 12px", cursor: "pointer" }}
         >
-          <span style={{ fontSize: 12 }}>📍</span>
+          <span style={{ fontSize: 12 }}>{isAutoLocation ? "🎯" : "📍"}</span>
           <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{location.name}</span>
         </button>
       </div>
@@ -66,6 +114,40 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
             >ℹ</button>
           </div>
         </div>
+
+        {/* Next Zman Live Countdown */}
+        {nextZman && msUntilNext !== null && (
+          <div
+            className="card"
+            style={{
+              padding: "14px 16px",
+              marginBottom: 12,
+              background: "linear-gradient(135deg, rgba(212,168,67,0.12), rgba(212,168,67,0.04))",
+              border: "1px solid rgba(212,168,67,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, color: "#d4a843", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 4 }}>NEXT ZMAN</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)" }}>{nextZman.name}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{fmt(nextZman.time)}</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", fontWeight: 600, letterSpacing: "0.08em", marginBottom: 4 }}>IN</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#d4a843", fontVariantNumeric: "tabular-nums", letterSpacing: "0.03em" }}>
+                {formatCountdown(msUntilNext)}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!nextZman && (
+          <div className="card" style={{ padding: "12px 16px", marginBottom: 12, textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>All Zmanim for today have passed.</div>
+          </div>
+        )}
 
         {/* Alot · Sunrise · Sunset in one row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
@@ -168,6 +250,11 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
             Calculations follow the <strong>Gra (Vilna Gaon)</strong> — halachic day from Netz HaChama to Shkia.
             Alot HaShachar = 72 min before Netz. Tzais = 42 min after Shkia.
             Candle lighting: {location.candleLightingMinutes} min before Shkia ({location.name} custom).
+            {isAutoLocation && (
+              <span style={{ display: "block", marginTop: 4 }}>
+                <span style={{ color: "#d4a843", fontWeight: 700 }}>📍 Auto-detected location</span> — coordinates from your device ({location.lat.toFixed(4)}°, {location.lng.toFixed(4)}°).
+              </span>
+            )}
           </div>
         </div>
 
