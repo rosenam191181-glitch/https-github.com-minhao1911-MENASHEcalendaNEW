@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Location } from "../lib/locations";
-import { NotificationPrefs } from "../hooks/useNotifications";
+import { NotificationPrefs, LeadTime, LEAD_TIME_OPTIONS } from "../hooks/useNotifications";
 
 interface SettingsPageProps {
   theme: string;
@@ -15,13 +15,15 @@ interface SettingsPageProps {
   onCensus: () => void;
   notifPermission: NotificationPermission;
   notifPrefs: NotificationPrefs;
+  leadTime: LeadTime;
   onUpdateNotifPref: (key: keyof NotificationPrefs, value: boolean) => Promise<boolean>;
+  onUpdateLeadTime: (mins: LeadTime) => void;
 }
 
 export default function SettingsPage({
   theme, location,
   onToggleTheme, onLocationClick, onPremium, onTahara, onYartzeit, onBirthday, onCommunity, onCensus,
-  notifPermission, notifPrefs, onUpdateNotifPref,
+  notifPermission, notifPrefs, leadTime, onUpdateNotifPref, onUpdateLeadTime,
 }: SettingsPageProps) {
   const [showHebrew, setShowHebrew] = useState(true);
   const [pendingKey, setPendingKey] = useState<keyof NotificationPrefs | null>(null);
@@ -79,6 +81,8 @@ export default function SettingsPage({
     if (notifPrefs[key] && notifPermission === "granted") return `${defaultText} · Active`;
     return defaultText;
   }
+
+  const anyActive = notifPrefs.shabbat || notifPrefs.havdalah || notifPrefs.holiday || notifPrefs.omer || notifPrefs.prayers || notifPrefs.parasha || notifPrefs.shema;
 
   return (
     <div style={{ padding: "0 0 4px" }}>
@@ -140,7 +144,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {notifPermission === "granted" && (notifPrefs.shabbat || notifPrefs.havdalah || notifPrefs.holiday || notifPrefs.omer || notifPrefs.prayers || notifPrefs.parasha) && (
+        {notifPermission === "granted" && anyActive && (
           <div style={{
             marginBottom: 10, padding: "10px 14px", borderRadius: 10,
             background: "rgba(212,168,67,0.1)", border: "1px solid rgba(212,168,67,0.25)",
@@ -150,18 +154,47 @@ export default function SettingsPage({
             <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {[
                 (notifPrefs.shabbat || notifPrefs.havdalah) && `Shabbat reminders scheduled for ${location.name}`,
-                notifPrefs.holiday && "Holiday alerts active — you'll be notified the morning before each holiday",
-                notifPrefs.parasha && "Weekly Parasha — reminder every Friday morning with this Shabbat's Torah portion",
-                notifPrefs.omer && "Omer reminders set — you'll be notified at nightfall each evening during the 49 days",
-                notifPrefs.prayers && `Prayer reminders active — Shacharit, Mincha & Maariv alerts for ${location.name}`,
+                notifPrefs.shema && `Latest Shema alerts — ${leadTime} min warning daily`,
+                notifPrefs.holiday && "Holiday alerts active — morning before each holiday",
+                notifPrefs.parasha && "Weekly Parasha — every Friday morning",
+                notifPrefs.omer && "Omer reminders at nightfall during the 49 days",
+                notifPrefs.prayers && `Prayer reminders (${leadTime} min warning) for ${location.name}`,
               ].filter(Boolean).join(" · ")}
             </div>
           </div>
         )}
 
+        {/* Lead time picker */}
+        <div className="card" style={{ marginBottom: 12, padding: "14px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Reminder Lead Time</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>How many minutes before each Zman to alert</div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {LEAD_TIME_OPTIONS.map((mins) => (
+                <button
+                  key={mins}
+                  onClick={() => onUpdateLeadTime(mins)}
+                  style={{
+                    width: 38, height: 32, borderRadius: 8, border: "1px solid",
+                    borderColor: leadTime === mins ? "#d4a843" : "var(--border)",
+                    background: leadTime === mins ? "rgba(212,168,67,0.15)" : "var(--elevated)",
+                    color: leadTime === mins ? "#d4a843" : "var(--text-muted)",
+                    fontSize: 12, fontWeight: leadTime === mins ? 700 : 500,
+                    cursor: "pointer", transition: "all 0.15s",
+                  }}
+                >
+                  {mins}m
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="card" style={{ marginBottom: 16, overflow: "hidden" }}>
           <Row
-            label="Candle Lighting"
+            label="🕯 Candle Lighting"
             sub={notifSubtitle("shabbat", `${18} min before Shabbat`)}
             right={
               <Toggle
@@ -173,7 +206,7 @@ export default function SettingsPage({
           />
           <div style={{ height: 1, background: "var(--border)" }} />
           <Row
-            label="Havdalah"
+            label="✨ Havdalah"
             sub={notifSubtitle("havdalah", "When Shabbat ends")}
             right={
               <Toggle
@@ -185,7 +218,31 @@ export default function SettingsPage({
           />
           <div style={{ height: 1, background: "var(--border)" }} />
           <Row
-            label="Holiday Alerts"
+            label="📖 Latest Shema"
+            sub={notifSubtitle("shema", `${leadTime} min warning — daily deadline`)}
+            right={
+              <Toggle
+                on={notifPrefs.shema}
+                onToggle={() => handleNotifToggle("shema", !notifPrefs.shema)}
+                disabled={notifBlocked || notifUnsupported || pendingKey === "shema"}
+              />
+            }
+          />
+          <div style={{ height: 1, background: "var(--border)" }} />
+          <Row
+            label="🕍 Prayer Reminders"
+            sub={notifSubtitle("prayers", `Shacharit, Mincha & Maariv — ${leadTime} min warning`)}
+            right={
+              <Toggle
+                on={notifPrefs.prayers}
+                onToggle={() => handleNotifToggle("prayers", !notifPrefs.prayers)}
+                disabled={notifBlocked || notifUnsupported || pendingKey === "prayers"}
+              />
+            }
+          />
+          <div style={{ height: 1, background: "var(--border)" }} />
+          <Row
+            label="✡ Holiday Alerts"
             sub={notifSubtitle("holiday", "Day before holidays")}
             right={
               <Toggle
@@ -197,7 +254,7 @@ export default function SettingsPage({
           />
           <div style={{ height: 1, background: "var(--border)" }} />
           <Row
-            label="📖 Weekly Parasha"
+            label="📜 Weekly Parasha"
             sub={notifSubtitle("parasha", "Friday morning · this Shabbat's Torah portion")}
             right={
               <Toggle
@@ -216,18 +273,6 @@ export default function SettingsPage({
                 on={notifPrefs.omer}
                 onToggle={() => handleNotifToggle("omer", !notifPrefs.omer)}
                 disabled={notifBlocked || notifUnsupported || pendingKey === "omer"}
-              />
-            }
-          />
-          <div style={{ height: 1, background: "var(--border)" }} />
-          <Row
-            label="🕍 Prayer Reminders"
-            sub={notifSubtitle("prayers", "Shacharit, Mincha & Maariv")}
-            right={
-              <Toggle
-                on={notifPrefs.prayers}
-                onToggle={() => handleNotifToggle("prayers", !notifPrefs.prayers)}
-                disabled={notifBlocked || notifUnsupported || pendingKey === "prayers"}
               />
             }
           />

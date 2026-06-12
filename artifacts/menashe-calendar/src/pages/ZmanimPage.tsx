@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { calculateZmanim, formatTime } from "../lib/zmanim";
 import { getHebrewDate, getHebrewMonthName, hebrewDayNumeral } from "../lib/hebrewCalendar";
 import { Location } from "../lib/locations";
+import { isNotifSupported, sendNotification, getLeadTime } from "../hooks/useNotifications";
 
 interface ZmanimPageProps {
   location: Location;
@@ -44,6 +45,92 @@ function formatCountdown(ms: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function RemindButton({ zmanName, time, tz }: { zmanName: string; time: Date | null; tz: string }) {
+  const [state, setState] = useState<"idle" | "set" | "denied" | "past">("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRemind = useCallback(async () => {
+    if (!time) return;
+    const now = Date.now();
+    const lead = getLeadTime();
+    const fireAt = time.getTime() - lead * 60 * 1000;
+
+    if (fireAt <= now) {
+      setState("past");
+      setTimeout(() => setState("idle"), 2000);
+      return;
+    }
+
+    if (!isNotifSupported()) {
+      setState("denied");
+      setTimeout(() => setState("idle"), 2000);
+      return;
+    }
+
+    let perm = Notification.permission;
+    if (perm === "denied") {
+      setState("denied");
+      setTimeout(() => setState("idle"), 2500);
+      return;
+    }
+    if (perm !== "granted") {
+      perm = await Notification.requestPermission();
+    }
+    if (perm !== "granted") {
+      setState("denied");
+      setTimeout(() => setState("idle"), 2500);
+      return;
+    }
+
+    const ms = fireAt - Date.now();
+    const timeStr = time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: tz });
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      sendNotification(
+        `⏰ ${zmanName} in ${lead} min`,
+        `${zmanName} is at ${timeStr}. Time to prepare!`,
+        `remind-${zmanName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`
+      );
+    }, ms);
+    setState("set");
+  }, [time, zmanName, tz]);
+
+  if (!time || time < new Date()) return null;
+
+  const color =
+    state === "set" ? "#d4a843" :
+    state === "denied" ? "#ef4444" :
+    state === "past" ? "var(--text-muted)" :
+    "var(--text-muted)";
+
+  const label =
+    state === "set" ? "🔔" :
+    state === "denied" ? "🔕" :
+    state === "past" ? "—" :
+    "🔔";
+
+  return (
+    <button
+      onClick={handleRemind}
+      title={state === "set" ? "Reminder set!" : `Remind me before ${zmanName}`}
+      style={{
+        background: state === "set" ? "rgba(212,168,67,0.12)" : "transparent",
+        border: `1px solid ${state === "set" ? "rgba(212,168,67,0.3)" : "var(--border)"}`,
+        borderRadius: 8,
+        padding: "4px 10px",
+        cursor: "pointer",
+        fontSize: 14,
+        color,
+        transition: "all 0.2s",
+        minWidth: 36,
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function ZmanimPage({ location, onInfo, onLocationClick }: ZmanimPageProps) {
   const [now, setNow] = useState(() => new Date());
 
@@ -71,12 +158,14 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
 
   const isAutoLocation = !["Jerusalem","Tel Aviv","Haifa","Be'er Sheva","Bnei Brak","Tzfat","Churachandpur","Imphal","Aizawl","Lunglei","New York","Los Angeles","Toronto","London","Paris","Melbourne"].includes(location.name);
 
+  const leadMins = getLeadTime();
+
   const prayerRows = [
-    { name: "Latest Shema",      sub: "Gra — 3 shaot after Netz HaChama",    time: zmanim.latestShema },
-    { name: "Latest Shacharit",  sub: "Gra — 4 shaot after Netz HaChama",    time: zmanim.latestShacharit },
-    { name: "Mincha Gedolah",    sub: "Earliest Mincha (½ shaah after Chatzot)", time: zmanim.minchaGedolah },
-    { name: "Mincha Ketana",     sub: "Preferred Mincha time",                time: zmanim.minchaKetana },
-    { name: "Plag HaMincha",     sub: "Earliest Ma'ariv / Shabbat acceptance", time: zmanim.plagHamincha },
+    { name: "Latest Shema",      sub: "Gra — 3 shaot after Netz HaChama",         time: zmanim.latestShema,    urgent: true },
+    { name: "Latest Shacharit",  sub: "Gra — 4 shaot after Netz HaChama",         time: zmanim.latestShacharit, urgent: false },
+    { name: "Mincha Gedolah",    sub: "Earliest Mincha (½ shaah after Chatzot)",   time: zmanim.minchaGedolah,  urgent: false },
+    { name: "Mincha Ketana",     sub: "Preferred Mincha time",                     time: zmanim.minchaKetana,   urgent: false },
+    { name: "Plag HaMincha",     sub: "Earliest Ma'ariv / Shabbat acceptance",     time: zmanim.plagHamincha,   urgent: false },
   ];
 
   return (
@@ -149,6 +238,11 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
           </div>
         )}
 
+        {/* Remind hint */}
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 10, paddingLeft: 2 }}>
+          🔔 Tap the bell on any upcoming time to set a {leadMins}-min reminder
+        </div>
+
         {/* Alot · Sunrise · Sunset in one row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
           <div className="card" style={{ padding: "12px 10px", textAlign: "center" }}>
@@ -174,7 +268,10 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
             <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Chatzot</div>
             <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Halachic noon — midpoint of the solar day</div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-primary)" }}>{fmt(zmanim.chatzot)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <RemindButton zmanName="Chatzot" time={zmanim.chatzot} tz={tz} />
+            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-primary)" }}>{fmt(zmanim.chatzot)}</div>
+          </div>
         </div>
 
         {/* Shabbat times */}
@@ -186,8 +283,9 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
                 <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Candle Lighting</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{location.candleLightingMinutes} min before sunset</div>
               </div>
-              <div style={{ marginLeft: "auto", fontSize: 24, fontWeight: 800, color: "#d4a843" }}>
-                {fmt(zmanim.candleLighting)}
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                <RemindButton zmanName="Candle Lighting" time={zmanim.candleLighting} tz={tz} />
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#d4a843" }}>{fmt(zmanim.candleLighting)}</div>
               </div>
             </div>
             <div className="divider" style={{ marginBottom: 12 }} />
@@ -196,7 +294,10 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
                 <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Havdalah / Tzais</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>3 stars — 42 min after sunset</div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>{fmt(zmanim.havdalah)}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <RemindButton zmanName="Havdalah" time={zmanim.havdalah} tz={tz} />
+                <div style={{ fontSize: 22, fontWeight: 800, color: "var(--text-primary)" }}>{fmt(zmanim.havdalah)}</div>
+              </div>
             </div>
           </div>
         )}
@@ -209,7 +310,10 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
                 <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>Tzais HaKochavim</div>
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Nightfall — 42 min after sunset (3 stars)</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>{fmt(zmanim.tzais)}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <RemindButton zmanName="Tzais HaKochavim" time={zmanim.tzais} tz={tz} />
+                <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)" }}>{fmt(zmanim.tzais)}</div>
+              </div>
             </div>
           </div>
         )}
@@ -219,12 +323,17 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
           <div className="section-header">PRAYERS (Gra / Vilna Gaon)</div>
           <div className="card" style={{ overflow: "hidden" }}>
             {prayerRows.map((item, i) => (
-              <div key={i} className="zmanim-row">
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{item.name}</div>
+              <div key={i} className="zmanim-row" style={item.urgent && item.time && item.time > now ? { background: "rgba(212,168,67,0.04)" } : {}}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: item.urgent ? "#d4a843" : "var(--text-primary)" }}>{item.name}</div>
                   {item.sub && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{item.sub}</div>}
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>{fmt(item.time)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <RemindButton zmanName={item.name} time={item.time} tz={tz} />
+                  <div style={{ fontSize: 18, fontWeight: 700, color: item.urgent && item.time && item.time > now ? "#d4a843" : "var(--text-primary)", minWidth: 52, textAlign: "right" }}>
+                    {fmt(item.time)}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -252,7 +361,7 @@ export default function ZmanimPage({ location, onInfo, onLocationClick }: Zmanim
             Candle lighting: {location.candleLightingMinutes} min before Shkia ({location.name} custom).
             {isAutoLocation && (
               <span style={{ display: "block", marginTop: 4 }}>
-                <span style={{ color: "#d4a843", fontWeight: 700 }}>📍 Auto-detected location</span> — coordinates from your device ({location.lat.toFixed(4)}°, {location.lng.toFixed(4)}°).
+                <span style={{ color: "#d4a843", fontWeight: 700 }}>🎯 Auto-detected location</span> — coordinates from your device ({location.lat.toFixed(4)}°, {location.lng.toFixed(4)}°).
               </span>
             )}
           </div>

@@ -59,7 +59,7 @@ export default function App() {
   });
   const [shareToken] = useState(() => new URLSearchParams(window.location.search).get("share"));
 
-  const { permission: notifPermission, prefs: notifPrefs, updatePref: updateNotifPref } = useNotifications(location);
+  const { permission: notifPermission, prefs: notifPrefs, leadTime, updatePref: updateNotifPref, updateLeadTime } = useNotifications(location);
 
   const isLight = theme === "light";
 
@@ -168,7 +168,9 @@ export default function App() {
             onCensus={() => setModal("census")}
             notifPermission={notifPermission}
             notifPrefs={notifPrefs}
+            leadTime={leadTime}
             onUpdateNotifPref={updateNotifPref}
+            onUpdateLeadTime={updateLeadTime}
           />
         );
     }
