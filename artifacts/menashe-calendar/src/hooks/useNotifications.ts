@@ -3,7 +3,7 @@ import { HebrewCalendar, HDate, flags } from "@hebcal/core";
 import { calculateZmanim } from "../lib/zmanim";
 import { Location } from "../lib/locations";
 import { getUpcomingParashiyot, getUpcomingHolidays as getLibHolidays } from "../lib/parasha";
-import { getYahrzeitEntries } from "../modals/YartzeitModal";
+import { getYahrzeitEntries } from "../lib/yahrzeit";
 import { hebrewDayNumeral } from "../lib/hebrewCalendar";
 
 export type NotificationPrefs = {
@@ -329,19 +329,17 @@ export function useNotifications(location: Location) {
 
         for (const entry of entries) {
           try {
-            const passDate = new Date(entry.passDateStr + "T12:00:00");
-            const hd = new HDate(passDate);
-            const hebrewDateStr = `${hebrewDayNumeral(hd.getDate())} ${HDate.getMonthName(hd.getMonth(), hd.getFullYear())}`;
+            const hebrewDateStr = `${hebrewDayNumeral(entry.hebrewDay)} ${HDate.getMonthName(entry.hebrewMonth, currentHYear)}`;
 
             for (let offset = 0; offset <= 1; offset++) {
-              const yhDate = new HDate(hd.getDate(), hd.getMonth(), currentHYear + offset);
+              const yhDate = new HDate(entry.hebrewDay, entry.hebrewMonth, currentHYear + offset);
               const greg = yhDate.greg();
               greg.setHours(7, 0, 0, 0);
               if (greg.getTime() > Date.now()) {
                 scheduleFor(greg, () =>
                   sendNotification(
-                    `🕯 Yahrtzeit — ${entry.name}`,
-                    `Today is the Yahrtzeit of ${entry.name} (${hebrewDateStr}). May their memory be a blessing. Light a candle and recite Kaddish.`,
+                    `🕯 Yahrzeit — ${entry.name}`,
+                    `Today is the Yahrzeit of ${entry.name} (${hebrewDateStr}). May their memory be a blessing. Light a candle and recite Kaddish.`,
                     `yahrzeit-${entry.id}-${currentHYear + offset}`
                   )
                 );

@@ -226,7 +226,7 @@ export default function App() {
             {modal === "torahnote" && <TorahNoteModal onClose={closeModal} />}
             {modal === "birthday" && <BirthdayModal onClose={closeModal} />}
             {modal === "tahara" && <TaharaModal onClose={closeModal} />}
-            {modal === "yartzeit" && <YartzeitModal onClose={closeModal} />}
+            {modal === "yartzeit" && <YartzeitModal onClose={closeModal} location={location} />}
             {modal === "community" && <CommunityModal onClose={closeModal} />}
             {modal === "census" && <CensusModal onClose={closeModal} />}
             {modal === "omer" && <OmerModal onClose={closeModal} />}
