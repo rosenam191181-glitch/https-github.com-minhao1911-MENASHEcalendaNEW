@@ -352,6 +352,192 @@ function DailyBriefingCard({ today, hdate, omerDay, onShowOmer }: {
   );
 }
 
+function CandleLightingCountdown({ location, onNavigate }: { location: Location; onNavigate: (page: string) => void }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const todayDay = now.getDay();
+  const isFriday = todayDay === 5;
+  const isShabbat = todayDay === 6;
+
+  type Mode = "candle" | "shabbat_begun" | "havdalah" | "shavua_tov";
+  let mode: Mode = "candle";
+  let targetTime: Date | null = null;
+  let headerLabel = "CANDLE LIGHTING";
+  let subLabel = "";
+  let timeStr = "";
+
+  if (isShabbat) {
+    const z = calculateZmanim(now, location.lat, location.lng, location.candleLightingMinutes);
+    if (z.havdalah && now < z.havdalah) {
+      mode = "havdalah";
+      targetTime = z.havdalah;
+      headerLabel = "HAVDALAH TONIGHT";
+      timeStr = formatTime(z.havdalah, location.tz);
+      subLabel = "Shabbat Shalom";
+    } else {
+      mode = "shavua_tov";
+    }
+  } else if (isFriday) {
+    const z = calculateZmanim(now, location.lat, location.lng, location.candleLightingMinutes);
+    if (z.candleLighting && now < z.candleLighting) {
+      mode = "candle";
+      targetTime = z.candleLighting;
+      subLabel = "Today";
+      timeStr = formatTime(z.candleLighting, location.tz);
+    } else {
+      mode = "shabbat_begun";
+      if (z.havdalah) timeStr = formatTime(z.havdalah, location.tz);
+    }
+  } else {
+    const daysUntil = ((5 - todayDay) + 7) % 7 || 7;
+    const nextFri = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntil, 12, 0, 0, 0);
+    const z = calculateZmanim(nextFri, location.lat, location.lng, location.candleLightingMinutes);
+    targetTime = z.candleLighting;
+    timeStr = formatTime(z.candleLighting, location.tz);
+    subLabel = daysUntil === 1
+      ? "Tomorrow"
+      : nextFri.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  const diff = targetTime ? Math.max(0, targetTime.getTime() - now.getTime()) : 0;
+  const totalSec = Math.floor(diff / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const progress = Math.min(100, Math.max(2, (1 - diff / (7 * 86400 * 1000)) * 100));
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  /* ── Shabbat has begun ── */
+  if (mode === "shabbat_begun") {
+    return (
+      <div style={{
+        marginBottom: 12, borderRadius: 16, overflow: "hidden",
+        background: "linear-gradient(135deg, #0c1a0c 0%, #0a1a10 60%, #0d160d 100%)",
+        border: "1px solid rgba(74,222,128,0.25)",
+        padding: "16px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        <div>
+          <div style={{ fontFamily: "'Noto Serif Hebrew', serif", fontSize: 22, color: "#4ade80", direction: "rtl", lineHeight: 1.1, marginBottom: 4 }}>שַׁבָּת שָׁלוֹם</div>
+          <div style={{ fontSize: 13, color: "rgba(74,222,128,0.7)", fontWeight: 600 }}>Shabbat is in progress</div>
+          {timeStr && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>Havdalah at {timeStr}</div>}
+        </div>
+        <div style={{ fontSize: 40, flexShrink: 0 }}>✨</div>
+      </div>
+    );
+  }
+
+  /* ── Shavua Tov ── */
+  if (mode === "shavua_tov") {
+    return (
+      <div style={{
+        marginBottom: 12, borderRadius: 16, overflow: "hidden",
+        background: "linear-gradient(135deg, #0a0a1a 0%, #100a20 100%)",
+        border: "1px solid rgba(167,139,250,0.25)",
+        padding: "16px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        <div>
+          <div style={{ fontFamily: "'Noto Serif Hebrew', serif", fontSize: 22, color: "#a78bfa", direction: "rtl", lineHeight: 1.1, marginBottom: 4 }}>שָׁבוּעַ טוֹב</div>
+          <div style={{ fontSize: 13, color: "rgba(167,139,250,0.7)", fontWeight: 600 }}>Shavua Tov — a wonderful week!</div>
+        </div>
+        <div style={{ fontSize: 40, flexShrink: 0 }}>🌟</div>
+      </div>
+    );
+  }
+
+  /* ── Countdown (candle or havdalah) ── */
+  const isHavdalah = mode === "havdalah";
+  const accentColor = isHavdalah ? "#a78bfa" : "#d4a843";
+  const borderColor = isHavdalah ? "rgba(167,139,250,0.3)" : "rgba(212,168,67,0.3)";
+  const bgGrad = isHavdalah
+    ? "linear-gradient(135deg, #0a0812 0%, #0f0820 60%, #120b1a 100%)"
+    : "linear-gradient(135deg, #100d00 0%, #0d1020 60%, #0a0d00 100%)";
+  const barGrad = isHavdalah
+    ? "linear-gradient(90deg, #4c1d95, #a78bfa, #c4b5fd)"
+    : "linear-gradient(90deg, #6b4800, #d4a843, #f0c050)";
+
+  return (
+    <div
+      onClick={() => onNavigate("zmanim")}
+      style={{
+        marginBottom: 12, borderRadius: 16, overflow: "hidden",
+        background: bgGrad, border: `1px solid ${borderColor}`,
+        cursor: "pointer",
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 6px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+            background: `rgba(${isHavdalah ? "167,139,250" : "212,168,67"},0.12)`,
+            border: `1px solid rgba(${isHavdalah ? "167,139,250" : "212,168,67"},0.25)`,
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+          }}>
+            {isHavdalah ? "✨" : "🕯"}
+          </div>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 900, color: accentColor, letterSpacing: "0.12em" }}>{headerLabel}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 1 }}>{subLabel}</div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{location.name}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: accentColor, letterSpacing: "-0.5px" }}>{timeStr}</div>
+        </div>
+      </div>
+
+      {/* Big countdown digits */}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 2, padding: "8px 14px 12px" }}>
+        {d > 0 && (
+          <>
+            <div style={{ textAlign: "center", minWidth: 52 }}>
+              <div style={{ fontSize: 42, fontWeight: 900, color: "white", lineHeight: 1, letterSpacing: "-2px", fontVariantNumeric: "tabular-nums" }}>{pad(d)}</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em", marginTop: 2 }}>DAYS</div>
+            </div>
+            <div style={{ fontSize: 34, fontWeight: 900, color: "rgba(255,255,255,0.2)", paddingBottom: 12, marginBottom: 2 }}>:</div>
+          </>
+        )}
+        <div style={{ textAlign: "center", minWidth: 52 }}>
+          <div style={{ fontSize: 42, fontWeight: 900, color: "white", lineHeight: 1, letterSpacing: "-2px", fontVariantNumeric: "tabular-nums" }}>{pad(h)}</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em", marginTop: 2 }}>HRS</div>
+        </div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: "rgba(255,255,255,0.2)", paddingBottom: 12, marginBottom: 2 }}>:</div>
+        <div style={{ textAlign: "center", minWidth: 52 }}>
+          <div style={{ fontSize: 42, fontWeight: 900, color: "white", lineHeight: 1, letterSpacing: "-2px", fontVariantNumeric: "tabular-nums" }}>{pad(m)}</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em", marginTop: 2 }}>MIN</div>
+        </div>
+        {d === 0 && (
+          <>
+            <div style={{ fontSize: 34, fontWeight: 900, color: "rgba(255,255,255,0.2)", paddingBottom: 12, marginBottom: 2 }}>:</div>
+            <div style={{ textAlign: "center", minWidth: 52 }}>
+              <div style={{ fontSize: 42, fontWeight: 900, color: accentColor, lineHeight: 1, letterSpacing: "-2px", fontVariantNumeric: "tabular-nums" }}>{pad(s)}</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", fontWeight: 700, letterSpacing: "0.1em", marginTop: 2 }}>SEC</div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+        <div style={{
+          width: `${progress}%`, height: "100%",
+          background: barGrad,
+          borderRadius: "0 2px 2px 0",
+          transition: "width 1s linear",
+        }} />
+      </div>
+    </div>
+  );
+}
+
 function getTodayHolidays(): string[] {
   const today = new Date();
   const events = HebrewCalendar.calendar({
@@ -511,6 +697,9 @@ export default function Home({
             </div>
           </div>
         </div>
+
+        {/* ── Candle Lighting Countdown ── */}
+        <CandleLightingCountdown location={location} onNavigate={onNavigate} />
 
         {/* ── Daily Spiritual Briefing ── */}
         <DailyBriefingCard today={today} hdate={hdate} omerDay={omerDay} onShowOmer={onShowOmer} />
